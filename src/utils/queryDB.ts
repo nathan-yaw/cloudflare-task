@@ -1,4 +1,16 @@
-import { Env } from './environment';
+import { Env } from '../types/environment';
+
+export async function getResourceNameByName(env: Env, key: string): Promise<string> {
+	const results = await env.image_store_db
+		.prepare('SELECT ImageName as name FROM Images WHERE ImageName = ?')
+		.bind(key)
+		.first<{ name: string }>();
+
+	if (!results) {
+		throw new Error('Failed to locate resource');
+	}
+	return results?.name as string;
+}
 
 /**
  * Checks if a key/filename exists already within our database.
@@ -9,6 +21,7 @@ import { Env } from './environment';
  * @returns - boolean: depending on whether or not the resource exists within the database
  */
 export async function keyExistsInDb(env: Env, key: String): Promise<boolean> {
+	console.log('Checking for key in db...');
 	const results = await env.image_store_db
 		.prepare('SELECT count(*) as count FROM Images WHERE ImageName = ?')
 		.bind(key)
@@ -42,7 +55,7 @@ export async function addKeyToDB(env: Env, key: String, alt_text: String): Promi
  */
 export async function getAltTextFromDB(env: Env, key: String): Promise<String> {
 	const success = await env.image_store_db
-		.prepare('SELECT AltText as altText FROM Images WHERE ImageName = ?')
+		.prepare('SELECT AltText as altText FROM Images WHERE ImageId = ?')
 		.bind(key)
 		.first<{ altText: string }>();
 
@@ -51,4 +64,19 @@ export async function getAltTextFromDB(env: Env, key: String): Promise<String> {
 	} else {
 		return 'Error';
 	}
+}
+
+/**
+ *
+ * @param env interface: bindings to Cloudflare services
+ * @returns response: result of query as json | 500 if query fails
+ */
+export async function auditData(env: Env): Promise<Response> {
+	const query = await env.image_store_db.prepare('SELECT * FROM Images;').all();
+
+	if (query) {
+		return Response.json(query);
+	}
+
+	return new Response('Internal Server Error', { status: 500 });
 }
