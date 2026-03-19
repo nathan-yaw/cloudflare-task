@@ -67,7 +67,7 @@ export async function getAltTextFromDB(env: Env, key: String): Promise<String> {
 }
 
 /**
- *
+ * has
  * @param env interface: bindings to Cloudflare services
  * @returns response: result of query as json | 500 if query fails
  */

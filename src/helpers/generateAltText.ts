@@ -22,3 +22,7 @@ export async function generateAltText(env: Env, image: ArrayBuffer): Promise<str
 	const altText = aiResponse['description'] as string;
 	return altText;
 }
+
+/**
+ * yikes
+ */
