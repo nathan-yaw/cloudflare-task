@@ -41,7 +41,7 @@ export default class extends WorkerEntrypoint<Env> {
 				if (url.pathname == '/audit') {
 					return auditData(this.env);
 				}
-				//If not cached git:
+				//If not cached:
 				console.log('Not fetching from cache :(');
 				console.log('Resource=' + resource);
 

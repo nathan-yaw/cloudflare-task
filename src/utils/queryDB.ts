@@ -48,7 +48,7 @@ export async function addKeyToDB(env: Env, key: String, alt_text: String): Promi
 }
 
 /**
- *
+ * @author Nathan Abuaku
  * @param env - interface: An interface containing bindings for different Cloudflare services
  * @param key - string: the name of the image file we're querying
  * @returns - string: the alt text for the given image file. or 'Error'
@@ -67,7 +67,7 @@ export async function getAltTextFromDB(env: Env, key: String): Promise<String> {
 }
 
 /**
- * has
+ * @author Nathan Abuaku
  * @param env interface: bindings to Cloudflare services
  * @returns response: result of query as json | 500 if query fails
  */
