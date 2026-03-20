@@ -32,7 +32,7 @@ export async function getFileType(contentType: string): Promise<Response | strin
 
 /**
  * @author Nathan Abuaku
- * @param request
+ * @param request: an HTTP request
  * @returns
  */
 export async function getContentType(request: Request): Promise<Response | string> {

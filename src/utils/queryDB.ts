@@ -85,3 +85,16 @@ export async function auditData(env: Env): Promise<Response> {
 
 	return new Response('Internal Server Error', { status: 500 });
 }
+
+export async function getFileNameFromD1(env: Env, key: string): Promise<string> {
+	const query = await env.image_store_db.prepare('SELECT FileName FROM Images WHERE ImageId = ?').bind(key).first<{ FileName: string }>();
+	if (!query) {
+		throw new Error('Image not found');
+	}
+
+	return query.FileName;
+}
+
+export async function deleteFromD1(env: Env, key: string) {
+	const query = await env.image_store_db.prepare('DELETE FROM Images WHERE ImageId = ?').bind(key).run();
+}

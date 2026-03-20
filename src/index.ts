@@ -12,7 +12,15 @@
  */
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { Env } from './types/environment';
-import { addKeyToDB, auditData, getAltTextFromDB, getResourceNameById, keyExistsInDb } from './utils/queryDB';
+import {
+	addKeyToDB,
+	auditData,
+	deleteFromD1,
+	getAltTextFromDB,
+	getFileNameFromD1,
+	getResourceNameById,
+	keyExistsInDb,
+} from './utils/queryDB';
 import { generateAltText } from './helpers/generateAltText';
 import { getContentType, getFileType } from './helpers/validateImageFile';
 import { validateApiKey } from './helpers/validateAPIKEY';
@@ -150,6 +158,14 @@ export default class extends WorkerEntrypoint<Env> {
 					size: object.size,
 					etag: object.etag,
 				});
+			}
+			case 'DELETE': {
+				const fileName = await getFileNameFromD1(this.env, key);
+				console.log('DELETING...' + fileName);
+				await this.env.image_bucket.delete(fileName);
+				deleteFromD1(this.env, key);
+
+				return new Response('Content Deleted', { status: 200 });
 			}
 			default:
 				return new Response('Method Not Allowed', {
