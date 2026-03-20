@@ -23,7 +23,7 @@ export async function getResourceNameById(env: Env, key: string): Promise<string
 export async function keyExistsInDb(env: Env, key: String): Promise<boolean> {
 	console.log('Checking for key in db...');
 	const results = await env.image_store_db
-		.prepare('SELECT count(FileName) as count FROM Images WHERE ImageName = ?')
+		.prepare('SELECT count(*) as count FROM Images WHERE FileName = ?')
 		.bind(key)
 		.first<{ count: number }>();
 	return (results?.count ?? 0) > 0;
@@ -37,15 +37,17 @@ export async function keyExistsInDb(env: Env, key: String): Promise<boolean> {
  * @param alt_text - string: the AI generated description of our image file
  * @returns - response: either 201, created or a 500 Internal server error
  */
-export async function addKeyToDB(env: Env, key: String, alt_text: String, contentType: string): Promise<Response> {
+export async function addKeyToDB(env: Env, key: String, alt_text: String, fileName: string, contentType: string): Promise<Response> {
 	const { success } = await env.image_store_db
 		.prepare('INSERT INTO Images (ImageName, AltText, FileName, contentType) VALUES (?, ?, ?, ?)')
-		.bind(key, alt_text, key, contentType)
+		.bind(key, alt_text, fileName, contentType)
 		.run();
 
 	if (success) {
+		console.log('KEY ADDED TO DB');
 		return new Response('Created', { status: 201 });
 	} else {
+		console.log('COULD NOT ADD KEY TO DB');
 		return new Response('Internal Server Error', { status: 500 });
 	}
 }

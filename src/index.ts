@@ -33,11 +33,11 @@ export default class extends WorkerEntrypoint<Env> {
 			resource = key;
 		}
 
-		const cached = await cache.match(request);
-		if (cached && api_key == this.env.API_KEY) {
-			console.log('Fetching response from cache...');
-			return cached;
-		}
+		// const cached = await cache.match(request);
+		// if (cached && api_key == this.env.API_KEY) {
+		// 	console.log('Fetching response from cache...');
+		// 	return cached;
+		// }
 
 		//Check if API Key in request
 		if (api_key != this.env.API_KEY || !api_key) {
@@ -74,14 +74,14 @@ export default class extends WorkerEntrypoint<Env> {
 					//Create new response from object body & Clone Response. Do this so we can consume the response twice, since we need an arrayBuffer for generating alt-text, and the cloned response for serving the image
 					const initialResponse = new Response(object.body);
 					const clonedResponse = initialResponse.clone();
+					const contentType = clonedResponse.headers.get('Content-Type') ?? 'image/jpg';
 
 					//Use the initial response to get arrayBuffer for processing image with AI.
 					const blob = await initialResponse.arrayBuffer();
 
 					const altText = await generateAltText(this.env, blob);
-					const contentType = await getContentType(request);
 					//Write key and alt-text to db
-					addKeyToDB(this.env, new_key, altText, contentType);
+					addKeyToDB(this.env, new_key, altText, resource, contentType);
 					//Write headers & return response
 					headers.set('alt-text', altText);
 					headers.set('Cache-Control', 'public, max_age=3600, immutable');
@@ -143,7 +143,7 @@ export default class extends WorkerEntrypoint<Env> {
 				const blob = await clonedRequest.arrayBuffer();
 				const altText = await generateAltText(this.env, blob);
 
-				await addKeyToDB(this.env, new_key, altText, contentType);
+				await addKeyToDB(this.env, new_key, altText, key, contentType);
 
 				return Response.json({
 					key: object.key,
