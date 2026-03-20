@@ -33,11 +33,11 @@ export default class extends WorkerEntrypoint<Env> {
 			resource = key;
 		}
 
-		// const cached = await cache.match(request);
-		// if (cached && api_key == this.env.API_KEY) {
-		// 	console.log('Fetching response from cache...');
-		// 	return cached;
-		// }
+		const cached = await cache.match(request);
+		if (cached && api_key == this.env.API_KEY) {
+			console.log('Fetching response from cache...');
+			return cached;
+		}
 
 		//Check if API Key in request
 		if (api_key != this.env.API_KEY || !api_key) {
