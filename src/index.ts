@@ -12,7 +12,7 @@
  */
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { Env } from './types/environment';
-import { addKeyToDB, auditData, getAltTextFromDB, getResourceNameByName, keyExistsInDb } from './utils/queryDB';
+import { addKeyToDB, auditData, getAltTextFromDB, getResourceNameById, keyExistsInDb } from './utils/queryDB';
 import { generateAltText } from './helpers/generateAltText';
 
 export default class extends WorkerEntrypoint<Env> {
@@ -25,7 +25,7 @@ export default class extends WorkerEntrypoint<Env> {
 		let resource;
 
 		try {
-			resource = await getResourceNameByName(this.env, key);
+			resource = await getResourceNameById(this.env, key);
 		} catch {
 			resource = key;
 		}
@@ -60,8 +60,9 @@ export default class extends WorkerEntrypoint<Env> {
 				headers.set('etag', object.httpEtag);
 
 				//Check if object has been added to the database yet
-				const keyInDb = await keyExistsInDb(this.env, key);
+				const keyInDb = await keyExistsInDb(this.env, resource);
 				if (keyInDb == false) {
+					const new_key = crypto.randomUUID();
 					//Create new response from object body & Clone Response. Do this so we can consume the response twice, since we need an arrayBuffer for generating alt-text, and the cloned response for serving the image
 					const initialResponse = new Response(object.body);
 					const clonedResponse = initialResponse.clone();
@@ -72,7 +73,7 @@ export default class extends WorkerEntrypoint<Env> {
 					const altText = await generateAltText(this.env, blob);
 
 					//Write key and alt-text to db
-					addKeyToDB(this.env, key + '.jpg', altText);
+					addKeyToDB(this.env, new_key, altText, key);
 					//Write headers & return response
 					headers.set('alt-text', altText);
 					headers.set('Cache-Control', 'public, max_age=3600, immutable');
@@ -108,8 +109,8 @@ export default class extends WorkerEntrypoint<Env> {
 				// }
 				//Get image being uploaded.
 				const clonedRequest = request.clone();
-				const imgName = key;
-				const object = await this.env.image_bucket.put(imgName, request.body, {
+				const new_key = crypto.randomUUID();
+				const object = await this.env.image_bucket.put(key, request.body, {
 					httpMetadata: {
 						contentType: 'image/jpg',
 					},
@@ -123,15 +124,13 @@ export default class extends WorkerEntrypoint<Env> {
 				const blob = await clonedRequest.arrayBuffer();
 				const altText = await generateAltText(this.env, blob);
 
-				await addKeyToDB(this.env, imgName, altText);
+				await addKeyToDB(this.env, new_key + '.jpg', altText, key);
 
 				return Response.json({
 					key: object.key,
 					size: object.size,
 					etag: object.etag,
 				});
-
-				return new Response(JSON.stringify({ message: 'To be implemented' }));
 			}
 			default:
 				return new Response('Method Not Allowed', {
