@@ -14,6 +14,8 @@ import { WorkerEntrypoint } from 'cloudflare:workers';
 import { Env } from './types/environment';
 import { addKeyToDB, auditData, getAltTextFromDB, getResourceNameById, keyExistsInDb } from './utils/queryDB';
 import { generateAltText } from './helpers/generateAltText';
+import { getContentType, getFileType } from './helpers/validateImageFile';
+import { validateApiKey } from './helpers/validateAPIKEY';
 
 export default class extends WorkerEntrypoint<Env> {
 	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -23,7 +25,8 @@ export default class extends WorkerEntrypoint<Env> {
 		const url = new URL(request.url);
 		const key = url.pathname.slice(1);
 		let resource;
-
+		const validContentTypes = ['image/jpg', 'image/png', 'image/webp'];
+		const api_key = request.headers.get('X-API-Key');
 		try {
 			resource = await getResourceNameById(this.env, key);
 		} catch {
@@ -31,20 +34,25 @@ export default class extends WorkerEntrypoint<Env> {
 		}
 
 		const cached = await cache.match(request);
-		if (cached) {
+		if (cached && api_key == this.env.API_KEY) {
 			console.log('Fetching response from cache...');
 			return cached;
 		}
-		//Use Switch statement to handle different HTTP requests
+
+		//Check if API Key in request
+		if (api_key != this.env.API_KEY || !api_key) {
+			return new Response('Not Authorized', { status: 401 });
+		}
+
+		//Handle different requests
 		switch (request.method) {
 			case 'GET': {
+				//If /audit is requested
 				if (url.pathname == '/audit') {
 					return auditData(this.env);
 				}
-				//If not cached:
-				console.log('Not fetching from cache :(');
-				console.log('Resource=' + resource);
 
+				//If not cached:
 				const object = await this.env.image_bucket.get(resource, {
 					onlyIf: request.headers,
 					range: request.headers,
@@ -71,14 +79,15 @@ export default class extends WorkerEntrypoint<Env> {
 					const blob = await initialResponse.arrayBuffer();
 
 					const altText = await generateAltText(this.env, blob);
-
+					const contentType = await getContentType(request);
 					//Write key and alt-text to db
-					addKeyToDB(this.env, new_key, altText, key);
+					addKeyToDB(this.env, new_key, altText, contentType);
 					//Write headers & return response
 					headers.set('alt-text', altText);
 					headers.set('Cache-Control', 'public, max_age=3600, immutable');
 					headers.set('Content-Type', 'image/jpeg');
 
+					//Build response and return
 					const res = new Response(clonedResponse.body, {
 						status: 200,
 						headers,
@@ -103,16 +112,27 @@ export default class extends WorkerEntrypoint<Env> {
 				}
 			}
 			case 'PUT': {
-				//url is accesible to us already and so is the endpoint, as the "key"
-				// /audit is our secure endpoint.
-				// if (endpoint == 'audit') {
-				// }
 				//Get image being uploaded.
 				const clonedRequest = request.clone();
 				const new_key = crypto.randomUUID();
-				const object = await this.env.image_bucket.put(key, request.body, {
+				const contentType = request.headers.get('Content-Type');
+				const contentLength = request.headers.get('Content-Length');
+
+				//Validate content-type
+				if (contentType == null || !validContentTypes.includes(contentType)) {
+					return new Response('Unsupported Media Type', { status: 415 });
+				}
+
+				//Validate Content Length
+				if (contentLength && parseInt(contentLength) > 2500000) {
+					return new Response('File too large!', { status: 413 });
+				}
+
+				//validateImageFile(this.env, clonedRequest);
+				const fileType = await getFileType(contentType);
+				const object = await this.env.image_bucket.put(new_key, request.body, {
 					httpMetadata: {
-						contentType: 'image/jpg',
+						contentType: contentType,
 					},
 				});
 
@@ -120,11 +140,10 @@ export default class extends WorkerEntrypoint<Env> {
 					return new Response('Precondition failed or upload returned null', { status: 412 });
 				}
 
-				//const clonedResponse = request.clone();
 				const blob = await clonedRequest.arrayBuffer();
 				const altText = await generateAltText(this.env, blob);
 
-				await addKeyToDB(this.env, new_key + '.jpg', altText, key);
+				await addKeyToDB(this.env, new_key, altText, contentType);
 
 				return Response.json({
 					key: object.key,
