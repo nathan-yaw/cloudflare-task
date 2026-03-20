@@ -12,18 +12,8 @@
  */
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { Env } from './types/environment';
-import {
-	addKeyToDB,
-	auditData,
-	deleteFromD1,
-	getAltTextFromDB,
-	getFileNameFromD1,
-	getResourceNameById,
-	keyExistsInDb,
-} from './utils/queryDB';
+import { addKeyToDB, auditData, deleteFromD1, getAltTextFromDB, getR2KeyFromD1, getResourceNameById, keyExistsInDb } from './utils/queryDB';
 import { generateAltText } from './helpers/generateAltText';
-import { getContentType, getFileType } from './helpers/validateImageFile';
-import { validateApiKey } from './helpers/validateAPIKEY';
 
 export default class extends WorkerEntrypoint<Env> {
 	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -136,8 +126,6 @@ export default class extends WorkerEntrypoint<Env> {
 					return new Response('File too large!', { status: 413 });
 				}
 
-				//validateImageFile(this.env, clonedRequest);
-				const fileType = await getFileType(contentType);
 				const object = await this.env.image_bucket.put(new_key, request.body, {
 					httpMetadata: {
 						contentType: contentType,
@@ -160,9 +148,9 @@ export default class extends WorkerEntrypoint<Env> {
 				});
 			}
 			case 'DELETE': {
-				const fileName = await getFileNameFromD1(this.env, key);
-				console.log('DELETING...' + fileName);
-				await this.env.image_bucket.delete(fileName);
+				const r2Key = await getR2KeyFromD1(this.env, key);
+				console.log('DELETING...' + r2Key);
+				await this.env.image_bucket.delete(r2Key);
 				deleteFromD1(this.env, key);
 
 				return new Response('Content Deleted', { status: 200 });

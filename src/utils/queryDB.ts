@@ -1,5 +1,11 @@
 import { Env } from '../types/environment';
 
+/**
+ * @Author Nathan Abuaku
+ * @param env - an interface containing our Cloudflare bindings
+ * @param key - an ImageId
+ * @returns
+ */
 export async function getResourceNameById(env: Env, key: string): Promise<string> {
 	const results = await env.image_store_db
 		.prepare('SELECT ImageName as name FROM Images WHERE ImageId = ?')
@@ -23,7 +29,7 @@ export async function getResourceNameById(env: Env, key: string): Promise<string
 export async function keyExistsInDb(env: Env, key: String): Promise<boolean> {
 	console.log('Checking for key in db...');
 	const results = await env.image_store_db
-		.prepare('SELECT count(*) as count FROM Images WHERE FileName = ?')
+		.prepare('SELECT count(*) as count FROM Images WHERE R2Key = ?')
 		.bind(key)
 		.first<{ count: number }>();
 	return (results?.count ?? 0) > 0;
@@ -37,10 +43,10 @@ export async function keyExistsInDb(env: Env, key: String): Promise<boolean> {
  * @param alt_text - string: the AI generated description of our image file
  * @returns - response: either 201, created or a 500 Internal server error
  */
-export async function addKeyToDB(env: Env, key: String, alt_text: String, fileName: string, contentType: string): Promise<Response> {
+export async function addKeyToDB(env: Env, key: String, alt_text: String, R2Key: string, contentType: string): Promise<Response> {
 	const { success } = await env.image_store_db
-		.prepare('INSERT INTO Images (ImageName, AltText, FileName, contentType) VALUES (?, ?, ?, ?)')
-		.bind(key, alt_text, fileName, contentType)
+		.prepare('INSERT INTO Images (ImageName, AltText, R2Key, contentType) VALUES (?, ?, ?, ?)')
+		.bind(key, alt_text, R2Key, contentType)
 		.run();
 
 	if (success) {
@@ -86,13 +92,13 @@ export async function auditData(env: Env): Promise<Response> {
 	return new Response('Internal Server Error', { status: 500 });
 }
 
-export async function getFileNameFromD1(env: Env, key: string): Promise<string> {
-	const query = await env.image_store_db.prepare('SELECT FileName FROM Images WHERE ImageId = ?').bind(key).first<{ FileName: string }>();
+export async function getR2KeyFromD1(env: Env, key: string): Promise<string> {
+	const query = await env.image_store_db.prepare('SELECT R2Key FROM Images WHERE ImageId = ?').bind(key).first<{ R2Key: string }>();
 	if (!query) {
 		throw new Error('Image not found');
 	}
 
-	return query.FileName;
+	return query.R2Key;
 }
 
 export async function deleteFromD1(env: Env, key: string) {
